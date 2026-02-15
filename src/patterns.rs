@@ -202,10 +202,18 @@ impl Patterns {
         let summary: Vec<String> = results
             .iter()
             .map(|p| {
+                let max_bytes = 200.min(p.content.len());
+                let truncate_at = p
+                    .content
+                    .char_indices()
+                    .map(|(i, _)| i)
+                    .take_while(|&i| i <= max_bytes)
+                    .last()
+                    .unwrap_or(0);
                 format!(
                     "**{}**\n{}",
                     p.metadata.pattern,
-                    &p.content[..200.min(p.content.len())]
+                    &p.content[..truncate_at]
                 )
             })
             .collect();
