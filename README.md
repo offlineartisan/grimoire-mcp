@@ -8,7 +8,7 @@ So, the Grimoire-MCP is a Model Context Protocol (MCP) server for managing softw
 
 ### Required Environment Variable
 
-The server **requires** the `PATTERNS_DIR` environment variable to be set:
+The server **requires** the `PATTERNS_DIR` environment variable to be set ideally via your MCP config, or in the shell:
 
 ```bash
 export PATTERNS_DIR="/path/to/your/patterns"
@@ -27,7 +27,7 @@ Patterns are stored as markdown files with YAML frontmatter:
 pattern: example-pattern
 category: rust
 framework: axum
-projects: [project1, project2]
+projects: [project1, project2] # These are the names of the projects this pattern was involved in.
 tags: [web, api, error-handling]
 ---
 
@@ -36,18 +36,6 @@ Your pattern content goes here...
 
 ## Usage
 
-### Development
-
-```bash
-# Set patterns directory
-export PATTERNS_DIR="/home/darko/workspace/kiro-projects/better-agent/pattern-library/patterns"
-
-# Run in debug mode
-just debug
-
-# Test with MCP inspector
-just mcp-test
-```
 
 ### Available Tools
 
@@ -66,7 +54,7 @@ The compiled binary will be at `./target/release/grimoire-mcp`.
 
 ## MCP Client Configuration
 
-### Amazon Q CLI
+### Kiro CLI
 
 Add to your MCP configuration:
 
@@ -117,4 +105,17 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
     }
   }
 }
+```
+
+## MCP Server Development
+
+```bash
+# Set patterns directory
+export PATTERNS_DIR="/home/darko/workspace/kiro-projects/better-agent/pattern-library/patterns"
+
+# Run in debug mode
+just debug
+
+# Test with MCP inspector
+just mcp-test
 ```
