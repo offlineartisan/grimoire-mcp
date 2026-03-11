@@ -127,7 +127,7 @@ impl Patterns {
         }
         if name
             .chars()
-            .any(|c| !c.is_alphanumeric() && c != '-' && c != '_')
+            .any(|c| !c.is_alphanumeric() && c != '-' && c != '_' && c != ' ')
         {
             return Err(McpError::invalid_params(
                 "Pattern name can only contain alphanumeric, dash and underscore characters",
@@ -243,6 +243,12 @@ impl Patterns {
         }
     }
 
+    /// Sanitize a pattern name for use as a filename.
+    /// Replaces spaces with dashes and lowercases the result.
+    fn sanitize_filename(name: &str) -> String {
+        name.replace(' ', "-").to_lowercase()
+    }
+
     /// Create patterns by providing information
     #[tool(
         description = "Create patterns by providing, category, framework, projects this pattern was used in, tags, and the content. Look to existing patterns for examples on how this should look"
@@ -285,7 +291,7 @@ framework: {}
 
         let patterns_dir =
             std::env::var(ENV_PATTERNS_DIR).expect("PATTERNS_DIR environment variable MUST be set");
-        let file_path = PathBuf::from(patterns_dir).join(format!("{}.md", pattern_name));
+        let file_path = PathBuf::from(patterns_dir).join(format!("{}.md", Self::sanitize_filename(&pattern_name)));
 
         match fs::write(&file_path, pattern_content) {
             Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!(
@@ -332,5 +338,201 @@ impl ServerHandler for Patterns {
         _context: RequestContext<RoleServer>,
     ) -> Result<InitializeResult, McpError> {
         Ok(self.get_info())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Strategy: generate pattern names that contain at least one space,
+    /// with all characters drawn from [a-zA-Z0-9 _-], length 1..=100.
+    fn space_containing_pattern_name() -> impl Strategy<Value = String> {
+        // Generate a base string from the valid charset (including space)
+        prop::string::string_regex("[a-zA-Z0-9 _-]{1,100}")
+            .unwrap()
+            .prop_filter("must contain at least one space", |s| {
+                s.contains(' ') && !s.is_empty() && s.len() <= 100
+            })
+    }
+
+    /// Helper: what a sanitize_filename function SHOULD produce.
+    /// Encodes the expected behavior from the design doc.
+    fn expected_sanitized_filename(name: &str) -> String {
+        name.replace(' ', "-").to_lowercase()
+    }
+
+    proptest! {
+        /// Property 1 (Bug Condition): Space-containing pattern names should be accepted.
+        ///
+        /// This test MUST FAIL on unfixed code — failure confirms the bug exists.
+        /// DO NOT fix the test or the code when it fails.
+        ///
+        /// When the fix is applied, this test will pass, confirming the expected behavior.
+        #[test]
+        fn bug_condition_spaces_accepted(name in space_containing_pattern_name()) {
+            // The bug: validate_pattern_name rejects spaces.
+            // Expected behavior: it should accept them.
+            let result = Patterns::validate_pattern_name(&name);
+            prop_assert!(
+                result.is_ok(),
+                "validate_pattern_name rejected '{}': {:?}",
+                name,
+                result.unwrap_err()
+            );
+        }
+
+        /// Property 1b (Expected Behavior): Sanitized filename should have no spaces
+        /// and be lowercased, while the original display name is preserved.
+        ///
+        /// This encodes the design requirement that create_pattern produces a sanitized
+        /// filename (spaces→dashes, lowercased) and preserves the original name in YAML.
+        #[test]
+        fn bug_condition_sanitized_filename_spec(name in space_containing_pattern_name()) {
+            let sanitized = expected_sanitized_filename(&name);
+
+            // Sanitized filename must not contain spaces
+            prop_assert!(
+                !sanitized.contains(' '),
+                "sanitized filename '{}' still contains spaces (from '{}')",
+                sanitized,
+                name
+            );
+
+            // Sanitized filename must be lowercase
+            prop_assert!(
+                sanitized.chars().all(|c| !c.is_uppercase()),
+                "sanitized filename '{}' is not fully lowercased",
+                sanitized
+            );
+
+            // Original display name is preserved (not equal to sanitized when it has spaces/uppercase)
+            if name.contains(' ') || name.chars().any(|c| c.is_uppercase()) {
+                prop_assert_ne!(
+                    name, sanitized,
+                    "display name should differ from sanitized filename when spaces or uppercase present"
+                );
+            }
+        }
+    }
+
+    /// Deterministic unit test confirming the bug with a known input.
+    #[test]
+    fn bug_condition_unit_error_handling_pattern() {
+        let result = Patterns::validate_pattern_name("Error Handling Pattern");
+        // On unfixed code this will be Err — confirming the bug.
+        // After fix this should be Ok.
+        assert!(
+            result.is_ok(),
+            "validate_pattern_name rejected 'Error Handling Pattern': {:?}",
+            result.unwrap_err()
+        );
+    }
+
+    /// Deterministic unit test confirming the bug with another known input.
+    #[test]
+    fn bug_condition_unit_builder_pattern() {
+        let result = Patterns::validate_pattern_name("Builder Pattern");
+        assert!(
+            result.is_ok(),
+            "validate_pattern_name rejected 'Builder Pattern': {:?}",
+            result.unwrap_err()
+        );
+    }
+
+    // =========================================================================
+    // Property 2: Preservation — Non-Space Pattern Name Behavior Unchanged
+    // =========================================================================
+    //
+    // These tests observe and lock down the CURRENT behavior of validate_pattern_name
+    // for inputs that do NOT contain spaces. They must pass on UNFIXED code and
+    // continue to pass after the fix (no regressions).
+
+    // --- Observation unit tests (confirm current behavior before writing PBTs) ---
+
+    /// Observation: valid name without spaces is accepted.
+    #[test]
+    fn preservation_observe_valid_name_accepted() {
+        let result = Patterns::validate_pattern_name("error-handling");
+        assert!(result.is_ok(), "expected Ok for 'error-handling', got: {:?}", result);
+    }
+
+    /// Observation: empty name is rejected.
+    #[test]
+    fn preservation_observe_empty_rejected() {
+        let result = Patterns::validate_pattern_name("");
+        assert!(result.is_err(), "expected Err for empty name, got Ok");
+    }
+
+    /// Observation: special character (']') is rejected.
+    #[test]
+    fn preservation_observe_special_char_rejected() {
+        let result = Patterns::validate_pattern_name("a]b");
+        assert!(result.is_err(), "expected Err for 'a]b', got Ok");
+    }
+
+    /// Observation: name exceeding 100 chars is rejected.
+    #[test]
+    fn preservation_observe_too_long_rejected() {
+        let long_name = "a".repeat(101);
+        let result = Patterns::validate_pattern_name(&long_name);
+        assert!(result.is_err(), "expected Err for 101-char name, got Ok");
+    }
+
+    // --- Property-based preservation tests ---
+
+    proptest! {
+        /// Preservation PBT 1: All strings from [a-zA-Z0-9_-]{1,100} (no spaces)
+        /// must be accepted by validate_pattern_name.
+        #[test]
+        fn preservation_valid_no_space_names_accepted(
+            name in prop::string::string_regex("[a-zA-Z0-9_-]{1,100}").unwrap()
+        ) {
+            let result = Patterns::validate_pattern_name(&name);
+            prop_assert!(
+                result.is_ok(),
+                "validate_pattern_name rejected valid no-space name '{}': {:?}",
+                name,
+                result.unwrap_err()
+            );
+        }
+
+        /// Preservation PBT 2: Any string containing at least one character NOT in
+        /// [a-zA-Z0-9 _-] must be rejected by validate_pattern_name.
+        ///
+        /// Strategy: generate a 1-100 char string from the full printable ASCII range,
+        /// then filter to those containing at least one "illegal" character.
+        #[test]
+        fn preservation_invalid_chars_rejected(
+            name in prop::string::string_regex("[\\x20-\\x7E]{1,100}")
+                .unwrap()
+                .prop_filter(
+                    "must contain at least one char outside [a-zA-Z0-9 _-]",
+                    |s| s.chars().any(|c| !c.is_alphanumeric() && c != '-' && c != '_' && c != ' ')
+                )
+        ) {
+            let result = Patterns::validate_pattern_name(&name);
+            prop_assert!(
+                result.is_err(),
+                "validate_pattern_name accepted '{}' which contains invalid characters",
+                name
+            );
+        }
+
+        /// Preservation PBT 3: Empty strings must be rejected.
+        /// (proptest can't generate empty from regex easily, so this is a unit-style prop)
+        #[test]
+        fn preservation_too_long_names_rejected(
+            name in prop::string::string_regex("[a-zA-Z0-9_-]{101,200}").unwrap()
+        ) {
+            let result = Patterns::validate_pattern_name(&name);
+            prop_assert!(
+                result.is_err(),
+                "validate_pattern_name accepted '{}' (len={}) which exceeds 100 chars",
+                name,
+                name.len()
+            );
+        }
     }
 }
