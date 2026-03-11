@@ -29,21 +29,21 @@ pub struct Patterns {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Pattern {
-    metadata: PatternMetadata,
-    content: String,
-    filepath: PathBuf,
+    pub metadata: PatternMetadata,
+    pub content: String,
+    pub filepath: PathBuf,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PatternMetadata {
-    pattern: String,
-    category: String,
+    pub pattern: String,
+    pub category: String,
     #[serde(default)]
-    framework: Option<String>,
+    pub framework: Option<String>,
     #[serde(default)]
-    projects: Vec<String>,
+    pub projects: Vec<String>,
     #[serde(default)]
-    tags: Vec<String>,
+    pub tags: Vec<String>,
 }
 
 // === Request structs ===
@@ -85,38 +85,39 @@ pub struct CreatePatternRequest {
     content: String,
 }
 
+/// Parse a single pattern from a markdown file with YAML frontmatter.
+pub fn load_pattern(path: &Path) -> Option<Pattern> {
+    let content = fs::read_to_string(path).ok()?;
+    let rest = content.strip_prefix("---\n")?;
+    let mut parts = rest.splitn(2, "\n---\n");
+    let yaml = parts.next()?;
+    let body = parts.next()?.trim();
+    let metadata: PatternMetadata = serde_yaml::from_str(yaml).ok()?;
+
+    Some(Pattern {
+        metadata,
+        content: body.to_string(),
+        filepath: path.to_path_buf(),
+    })
+}
+
+/// Load all patterns from the `PATTERNS_DIR` environment variable directory.
+pub fn load_all_patterns() -> Vec<Pattern> {
+    let patterns_dir =
+        std::env::var(ENV_PATTERNS_DIR).expect("PATTERNS_DIR environment variable MUST be set");
+    let patterns_dir = PathBuf::from(patterns_dir);
+
+    fs::read_dir(&patterns_dir)
+        .ok()
+        .into_iter()
+        .flatten()              // Extract good ReadDir
+        .flat_map(|e| e.ok())   // Convert Result<DirEntry, Err> to DirEntry
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
+        .filter_map(|e| load_pattern(&e.path()))
+        .collect()
+}
+
 impl Patterns {
-    /// Parse pattern from file
-    fn load_patterns(path: &Path) -> Option<Pattern> {
-        let content = fs::read_to_string(path).ok()?;
-        let rest = content.strip_prefix("---\n")?;
-        let mut parts = rest.splitn(2, "\n---\n");
-        let yaml = parts.next()?;
-        let body = parts.next()?.trim();
-        let metadata: PatternMetadata = serde_yaml::from_str(yaml).ok()?;
-
-        Some(Pattern {
-            metadata,
-            content: body.to_string(),
-            filepath: path.to_path_buf(),
-        })
-    }
-
-    /// Load patterns from the provided directory
-    fn load_all_patterns() -> Vec<Pattern> {
-        let patterns_dir =
-            std::env::var(ENV_PATTERNS_DIR).expect("PATTERNS_DIR environment variable MUST be set");
-        let patterns_dir = PathBuf::from(patterns_dir);
-
-        fs::read_dir(&patterns_dir)
-            .ok()
-            .into_iter()
-            .flatten()              // Extract good ReadDir
-            .flat_map(|e| e.ok())   // Convet Result<DireEntry, Err> to DirEntry
-            .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
-            .filter_map(|e| Self::load_patterns(&e.path()))
-            .collect()
-    }
     /// Validate the pattern name during creation
     fn validate_pattern_name(name: &str) -> Result<(), McpError> {
         if name.is_empty() || name.len() > 100 {
@@ -144,7 +145,7 @@ impl Patterns {
 impl Patterns {
     pub fn new() -> Self {
         Self {
-            patterns: Arc::new(Self::load_all_patterns()),
+            patterns: Arc::new(load_all_patterns()),
             tool_router: Self::tool_router(),
         }
     }

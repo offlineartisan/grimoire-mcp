@@ -44,13 +44,44 @@ Your pattern content goes here...
 - `get_pattern` - Get specific pattern by name
 - `create_pattern` - Create new pattern with metadata and content
 
+## Pattern Browser TUI
+
+The project includes a terminal-based pattern browser (`browse`) as a separate binary target. It lets you browse, search, and read your patterns directly in the terminal without needing an MCP client.
+
+### Running the Browser
+
+```bash
+PATTERNS_DIR="/path/to/your/patterns" cargo run --bin browse
+```
+
+Or build and run the release binary:
+
+```bash
+cargo build --release
+PATTERNS_DIR="/path/to/your/patterns" ./target/release/browse
+```
+
+### Keyboard Controls
+
+| Key | Action |
+|-----|--------|
+| `j` / `↓` | Navigate down |
+| `k` / `↑` | Navigate up |
+| `/` | Search / filter patterns |
+| `Esc` | Cancel search |
+| `Enter` | Apply search filter |
+| `PgUp` / `PgDn` | Scroll pattern content |
+| `q` | Quit |
+
 ## Building
 
 ```bash
 cargo build --release
 ```
 
-The compiled binary will be at `./target/release/grimoire-mcp`.
+This produces two binaries:
+- `./target/release/grimoire-mcp` — the MCP server
+- `./target/release/browse` — the TUI pattern browser
 
 ## MCP Client Configuration
 

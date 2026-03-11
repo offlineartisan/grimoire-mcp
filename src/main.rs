@@ -1,8 +1,7 @@
 use anyhow::Result;
 use rmcp::{ServiceExt, transport::stdio};
 use tracing_subscriber::{self, EnvFilter};
-mod patterns;
-use patterns::Patterns;
+use grimoire_mcp::patterns::Patterns;
 
 #[tokio::main]
 async fn main() -> Result<()> {
