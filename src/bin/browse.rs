@@ -119,23 +119,24 @@ impl App {
 
         std::thread::spawn(move || {
             loop {
-                if crossterm::event::poll(std::time::Duration::from_millis(100)).unwrap_or(false) {
-                    if let Ok(crossterm::event::Event::Key(key_event)) = crossterm::event::read() {
-                        if tx.send(key_event).is_err() {
-                            break; // receiver dropped, exit thread
-                        }
-                    }
+                if crossterm::event::poll(std::time::Duration::from_millis(100)).unwrap_or(false)
+                    && let Ok(crossterm::event::Event::Key(key_event)) = crossterm::event::read()
+                    && tx.send(key_event).is_err()
+                {
+                    break; // receiver dropped, exit thread
                 }
             }
         });
 
         while self.running {
-            terminal.draw(|frame| draw(frame, self)).expect("failed to draw");
+            terminal
+                .draw(|frame| draw(frame, self))
+                .expect("failed to draw");
 
-            if let Ok(key_event) = rx.recv_timeout(std::time::Duration::from_millis(50)) {
-                if key_event.kind == crossterm::event::KeyEventKind::Press {
-                    self.handle_key(key_event.code);
-                }
+            if let Ok(key_event) = rx.recv_timeout(std::time::Duration::from_millis(50))
+                && key_event.kind == crossterm::event::KeyEventKind::Press
+            {
+                self.handle_key(key_event.code);
             }
 
             self.tick += 1;
@@ -169,7 +170,7 @@ fn draw_title(frame: &mut Frame, area: Rect) {
     let big_title = BigText::builder()
         .pixel_size(PixelSize::HalfHeight)
         .style(Style::new().blue())
-        .lines(vec!["Grimoire".blue().into()])
+        .lines(vec!["Code Grimoire".blue().into()])
         .alignment(Alignment::Center)
         .build();
     frame.render_widget(big_title, area);
@@ -255,13 +256,11 @@ fn draw_status(frame: &mut Frame, area: Rect, app: &App) {
             Paragraph::new("q: quit | j/k: navigate | /: search | PgUp/PgDn: scroll")
                 .alignment(Alignment::Center)
         }
-        InputMode::Searching => {
-            Paragraph::new(Line::from(vec![
-                Span::styled("Search: ", Style::new().yellow()),
-                Span::raw(&app.search_query),
-                Span::raw("▌"),
-            ]))
-        }
+        InputMode::Searching => Paragraph::new(Line::from(vec![
+            Span::styled("Search: ", Style::new().yellow()),
+            Span::raw(&app.search_query),
+            Span::raw("▌"),
+        ])),
     };
     frame.render_widget(status, area);
 }

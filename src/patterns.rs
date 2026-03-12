@@ -110,8 +110,8 @@ pub fn load_all_patterns() -> Vec<Pattern> {
     fs::read_dir(&patterns_dir)
         .ok()
         .into_iter()
-        .flatten()              // Extract good ReadDir
-        .flat_map(|e| e.ok())   // Convert Result<DirEntry, Err> to DirEntry
+        .flatten() // Extract good ReadDir
+        .flat_map(|e| e.ok()) // Convert Result<DirEntry, Err> to DirEntry
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
         .filter_map(|e| load_pattern(&e.path()))
         .collect()
@@ -138,7 +138,13 @@ impl Patterns {
 
         Ok(())
     }
+}
 
+/// Default implementation to please clippy
+impl Default for Patterns {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[tool_router]
@@ -179,14 +185,15 @@ impl Patterns {
         let results: Vec<&Pattern> = self
             .patterns
             .iter()
-            .filter(|p| { // Search through the fields
+            .filter(|p| {
+                // Search through the fields
                 category.as_ref().is_none_or(|c| &p.metadata.category == c)
                     && framework
                         .as_ref()
                         .is_none_or(|f| p.metadata.framework.as_ref() == Some(f))
                     && tag.as_ref().is_none_or(|t| p.metadata.tags.contains(t))
-                    && query.as_ref().is_none_or(|q| { 
-                    // Match query to the pattern name and content
+                    && query.as_ref().is_none_or(|q| {
+                        // Match query to the pattern name and content
                         let searchable =
                             format!("{} {}", p.metadata.pattern, p.content).to_lowercase();
                         searchable.contains(&q.to_lowercase())
@@ -211,11 +218,7 @@ impl Patterns {
                     .take_while(|&i| i <= max_bytes)
                     .last()
                     .unwrap_or(0);
-                format!(
-                    "**{}**\n{}",
-                    p.metadata.pattern,
-                    &p.content[..truncate_at]
-                )
+                format!("**{}**\n{}", p.metadata.pattern, &p.content[..truncate_at])
             })
             .collect();
 
@@ -292,7 +295,8 @@ framework: {}
 
         let patterns_dir =
             std::env::var(ENV_PATTERNS_DIR).expect("PATTERNS_DIR environment variable MUST be set");
-        let file_path = PathBuf::from(patterns_dir).join(format!("{}.md", Self::sanitize_filename(&pattern_name)));
+        let file_path = PathBuf::from(patterns_dir)
+            .join(format!("{}.md", Self::sanitize_filename(&pattern_name)));
 
         match fs::write(&file_path, pattern_content) {
             Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!(
@@ -456,7 +460,11 @@ mod tests {
     #[test]
     fn preservation_observe_valid_name_accepted() {
         let result = Patterns::validate_pattern_name("error-handling");
-        assert!(result.is_ok(), "expected Ok for 'error-handling', got: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "expected Ok for 'error-handling', got: {:?}",
+            result
+        );
     }
 
     /// Observation: empty name is rejected.
