@@ -8,7 +8,7 @@ use rmcp::{
     RoleServer, ServerHandler,
     handler::server::{tool::ToolRouter, wrapper::Parameters},
     model::{
-        CallToolResult, Content, Implementation, InitializeRequestParam, InitializeResult,
+        CallToolResult, Content, Implementation, InitializeRequestParams, InitializeResult,
         ProtocolVersion, ServerCapabilities, ServerInfo,
     },
     schemars,
@@ -315,11 +315,10 @@ framework: {}
 impl ServerHandler for Patterns {
     /// Provide server information and capabilities
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            protocol_version: ProtocolVersion::V_2024_11_05,
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
-            server_info: Implementation::from_build_env(),
-            instructions: Some(
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+            .with_server_info(Implementation::from_build_env())
+            .with_protocol_version(ProtocolVersion::V_2024_11_05)
+            .with_instructions(
     "I manage a library of software development patterns stored as markdown files with YAML frontmatter.
     Use me to discover, search, and create reusable code patterns and architectural solutions.
 
@@ -333,13 +332,12 @@ impl ServerHandler for Patterns {
     Each pattern contains implementation details, best practices, and usage examples.
 
     When creating patterns, include relevant tags and specify which projects used them for better discoverability.".to_string()
-),
-        }
+)
     }
 
     async fn initialize(
         &self,
-        _request: InitializeRequestParam,
+        _request: InitializeRequestParams,
         _context: RequestContext<RoleServer>,
     ) -> Result<InitializeResult, McpError> {
         Ok(self.get_info())

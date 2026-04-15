@@ -6,7 +6,8 @@ description = "A Model Context Protocol server for managing software development
 
 [dependencies]
 anyhow = "1.0.100"
-rmcp = { version = "0.8.5", features = ["transport-io"] }
+rmcp = { version = "1.4.0", features = ["transport-io", "server", "macros", "schemars"] }
+schemars = "1.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 serde_yaml = "0.9.34"
