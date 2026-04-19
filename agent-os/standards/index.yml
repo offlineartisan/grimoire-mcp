@@ -1,0 +1,41 @@
+# Agent OS Standards Index
+
+mcp:
+  error-semantics:
+    description: Three-way split — success text, invalid_params, internal_error — by who can act on the result.
+  handler-signature:
+    description: Inline-destructure the request struct in the tool handler parameter list.
+  request-structs:
+    description: Dedicated request struct per MCP tool with schemars + serde; the interface contract.
+  router-wiring:
+    description: tool_router + tool_handler impl block split and constructor wiring.
+
+patterns:
+  fail-soft-load:
+    description: Discovery drops unparseable files; stdout stays pristine, stderr for warnings.
+  file-format:
+    description: YAML frontmatter + markdown body; category required, framework optional, vecs default.
+  naming-rules:
+    description: 1-100 chars, charset [a-zA-Z0-9 _-]; space→dash filename rule.
+  validate-vs-sanitize:
+    description: Validate rejects, sanitize transforms — display name preserved, file name derived.
+
+testing:
+  bug-fix-naming:
+    description: bug_condition_* must fail then pass; preservation_* must pass both ways.
+  paired-unit-property:
+    description: Every property test ships with a deterministic anchor test sharing the same prefix.
+  spec-oracle:
+    description: Test expected values come from spec helpers, never the SUT — avoids circular assertions.
+  strategies:
+    description: Proptest input spaces live in named fns returning impl Strategy<Value=T>.
+
+tui:
+  event-thread:
+    description: Background crossterm poll + mpsc channel; render loop uses recv_timeout to stay non-blocking.
+  filter-as-indices:
+    description: Filtered views are Vec<usize> into the owned patterns; no clones, no lifetimes.
+  init-safety:
+    description: Validate env before ratatui init; pair init/restore; install panic hook.
+  mode-enum:
+    description: InputMode enum with per-mode match in handle_key; compiler enforces exhaustiveness.
